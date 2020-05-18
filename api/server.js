@@ -10,8 +10,8 @@ module.exports = class ContactsServer {
   async start() {
     this.initServer();
     this.initMidelwares();
-    this.initRouters();
     await this.initDatabase();
+    this.initRouters();
     this.startListening();
   }
 
@@ -24,9 +24,6 @@ module.exports = class ContactsServer {
     this.server.use(express.urlencoded({ extended: true }));
   }
 
-  initRouters() {
-    this.server.use('/contacts', Routers);
-  }
   async initDatabase() {
     await mongoose.connect(process.env.dbUrl, {
       useNewUrlParser: true,
@@ -35,6 +32,9 @@ module.exports = class ContactsServer {
     });
     console.log('connected sucessfully to server');
 }
+  initRouters() {
+    this.server.use('/contacts', Routers);
+  }
   startListening() {
       try{
     const PORT = process.env.PORT;
