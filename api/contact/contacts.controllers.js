@@ -6,7 +6,7 @@ const {
 
 const Joi = require('joi');
 
-module.exports = class ContactsControllers {
+module.exports = {
   async createContact(req, res, next) {
     try {
       const contact = await contactModel.create(req.body);
@@ -14,7 +14,7 @@ module.exports = class ContactsControllers {
     } catch (err) {
       next(err);
     }
-  }
+  },
   async contactsGet(req, res, next) {
     try {
       const contactFind = await contactModel.find();
@@ -22,7 +22,7 @@ module.exports = class ContactsControllers {
     } catch (err) {
       next(err);
     }
-  }
+  },
 
   async contactsGetByID(req, res, next) {
     try {
@@ -35,7 +35,7 @@ module.exports = class ContactsControllers {
     } catch (err) {
       res.send(err);
     }
-  }
+  },
 
   
   async contactsDel(req, res, next) {
@@ -49,7 +49,7 @@ module.exports = class ContactsControllers {
         } catch (err) {
             next(err);
         }
-    }
+    },
     async contactsUpdate(req, res, next) {
         try {
             const contactId = req.params.id;
@@ -68,7 +68,7 @@ module.exports = class ContactsControllers {
         } catch (err) {
             next(err);
         }
-    };
+    },
     
     validateId(req, res, next) {
       const { id } = req.params;
@@ -76,7 +76,7 @@ module.exports = class ContactsControllers {
         return res.status(400).send();
       }
       next();
-    };
+    },
 
     validationBodyRules(req, res, next) {
         const bodyRules = Joi.object({
@@ -89,7 +89,7 @@ module.exports = class ContactsControllers {
       return res.status(400).json({ message: 'missing required name field' });
     }
     next();
-  };
+  },
 
   validationUpdateBodyRules(req, res, next) {
     const bodyRules = Joi.object({
