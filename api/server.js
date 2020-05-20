@@ -10,8 +10,8 @@ module.exports = class UsersServer {
   async start() {
     this.initServer();
     this.initMidelwares();
-    this.initRouters();
     await this.initDatabase();
+    this.initRouters();
     this.startListening();
   }
 

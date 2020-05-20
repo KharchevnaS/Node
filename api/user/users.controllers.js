@@ -6,27 +6,27 @@ const jwt = require('jsonwebtoken');
 const { UnauthorizedError } = require('../helpers/errors.constructor');
 const _ = require('lodash');
 
-module.exports = class UsersControllers {
+class UserControllers {
 constructor() {
 this._costFactor = 7;
-};
-get addUser() {
-  return this._addUser.bind(this);
-};
+}
+get registerUser() {
+  return this._registerUser.bind(this);
+}
 
 get usersGet () {
   return this._usersGet.bind(this);
-};
+}
 
 get usersGetByID() {
   return this._usersGetByID.bind(this);
-};
+}
 
-get  getCurrentUser() {
+get getCurrentUser() {
   return this._getCurrentUser.bind(this);
-};
+}
 
-  async _addUser(req, res, next) {
+  async _registerUser(req, res, next) {
     try {
       const { password, email } = req.body;
       const passwordHash = await bcryptjs.hash(password, this._costFactor);
@@ -47,29 +47,30 @@ get  getCurrentUser() {
     } catch (err) {
       next(err);
     }
-  };
+  }
 
-  async signIn(req, res, next) {
+  async logIn(req, res, next) {
  try {
 const {email, password} = req.body;
+
 const user = await userModel.findUserByEmail(email);
 if (!user){
   return  res.status(400).json({ "message": "Неверный логин или пароль"})
 }
 const isPasswordValid = await bcryptjs.compare(password, user.password);
-if (!isPasswordValid) {
+if (isPasswordValid.error) {
   return res.status(400).json({ "message": "Неверный логин или пароль"})
 }
 const token = await jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
-  expiresIn: 1*10*5*10,
+  expiresIn: 1 * 15 * 15 * 10,
 });
 await userModel.updateToken(user._id, token);
-return res.status(200).json({token});
+return res.status(200).json({ token });
 }
  catch(err){
    next(err);
  }
-  };
+  }
 
   async _usersGet(req, res, next) {
     try {
@@ -78,12 +79,12 @@ return res.status(200).json({token});
     } catch (err) {
       next(err);
     }
-  };
+  }
 
   async _usersGetByID(req, res, next) {
     try {
       const userId = req.params.id;
-      const user = await userModel.findById({ userId });
+      const user = await userModel.findOne({ _id:userId });
       if (!user) {
         return res.status(404).send();
       }
@@ -92,7 +93,7 @@ return res.status(200).json({token});
     } catch (err) {
       next(err);
     }
-  };
+  }
 
   async usersDel(req, res, next) {
       try {
@@ -105,7 +106,7 @@ return res.status(200).json({token});
         } catch (err) {
             next(err);
         }
-  };
+  }
 
   async usersUpdate(req, res, next) {
         try {
@@ -124,7 +125,7 @@ return res.status(200).json({token});
         } catch (err) {
             next(err);
         }
-  };
+  }
 
   async logout(req, res, next) {
   try {
@@ -135,17 +136,12 @@ return res.status(204).send();
   catch(err){
     res.status(401).json({"message": "Not authorized"});
   }
-  };
+  }
 
   async _getCurrentUser(req, res, next) {
-    try{
-   const [ userForResponse ]= this.prepareUsersResponse([req.user]);
-     return res.status(200).json(userForResponse);
-    }
-    catch(err){
-     res.status(401).json({"message": "Not authorized"})
-    }
-  }; 
+ const [userForResponse] = this.prepareUsersResponse([req.user])
+return  res.status(200).json(userForResponse)
+  }
 
   async  authorize(req, res, next) {
     try {
@@ -169,7 +165,7 @@ return res.status(204).send();
     } catch (err) {
       next(err);
     }
-  };
+  }
     
   validateId(req, res, next) {
       const { id } = req.params;
@@ -177,7 +173,7 @@ return res.status(204).send();
         return res.status(400).send();
       }
       next();
-  };
+  }
 
   validationBodyRules(req, res, next) {
         const bodyRules = Joi.object({
@@ -190,7 +186,7 @@ return res.status(204).send();
       return res.status(400).json({ message: 'missing required name field' });
     }
     next();
-  };
+  }
 
   validationUpdateBodyRules(req, res, next) {
     const bodyRules = Joi.object({
@@ -203,7 +199,7 @@ return res.status(204).send();
       return res.status(400).json({ message: 'missing required name field' });
     }
     next();
-  };
+  }
 
   validateSignIn(req, res, next) {
 const signInRules = Joi.object({
@@ -211,16 +207,18 @@ const signInRules = Joi.object({
   password: Joi.string().required(),
 })
 const validationResult = Joi.validate(req.query, signInRules);
-if (validationResult.error) {
+if (!validationResult) {
   return res.status(400).send(validationResult.error);
 }
 next();
-  };
+  }
 
   prepareUsersResponse(users) {
     return users.map((user) => { 
-      const { _id, email, password, subscription } = user;
-      return { id: _id, email, password, subscription };
+      const { email, subscription } = user;
+      return { email, subscription };
     })
+}
 };
-};
+
+module.exports = new UserControllers();
