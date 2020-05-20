@@ -6,7 +6,6 @@ const {
 
 
 module.exports = {
-
   async createContact(req, res, next) {
     try {
       const contact = await contactModel.create(req.body);
@@ -54,7 +53,7 @@ module.exports = {
         }
     },
 
-  async contactsUpdate(req, res, next) {
+    async contactsUpdate(req, res, next) {
         try {
             const contactId = req.params.id;
             const contactUpdate = await contactModel.findByIdAndUpdate(contactId, {
