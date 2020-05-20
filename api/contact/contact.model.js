@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const { Schema } = mongoose;
+mongoose.set('useCreateIndex', true);
 
 const contactSchema = new Schema({
     name: { type: String, required: [true, "contact's First name and Last name are required"] },

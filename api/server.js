@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const Routers = require('./contact/contacts.routers');
 require('dotenv').config();
 
+
 module.exports = class ContactsServer {
   constructor() {
     this.server = null;
@@ -35,15 +36,18 @@ module.exports = class ContactsServer {
   initRouters() {
     this.server.use('/contacts', Routers);
   }
+
   startListening() {
-      try{
+    try{
     const PORT = process.env.PORT;
     this.server.listen(PORT, () => {
       console.log('listening on port', PORT);
-    });}
-    catch (e){
-    console.log('Server error', e.message)
+    })
+  }
+    catch (error){
+    console.log('Server error', error.message)
     process.exit(1)
     }
   }
+  
 }
