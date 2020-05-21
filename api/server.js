@@ -1,10 +1,9 @@
 const express = require('express');
 const mongoose = require('mongoose');
-const Routers = require('./contact/contacts.routers');
+const Routers = require('./user/users.routers');
 require('dotenv').config();
 
-
-module.exports = class ContactsServer {
+module.exports = class UsersServer {
   constructor() {
     this.server = null;
   }
@@ -25,6 +24,10 @@ module.exports = class ContactsServer {
     this.server.use(express.urlencoded({ extended: true }));
   }
 
+  initRouters() {
+    this.server.use('/users', Routers);
+  };
+
   async initDatabase() {
     await mongoose.connect(process.env.dbUrl, {
       useNewUrlParser: true,
@@ -33,21 +36,16 @@ module.exports = class ContactsServer {
     });
     console.log('connected sucessfully to server');
 }
-  initRouters() {
-    this.server.use('/contacts', Routers);
-  }
-
   startListening() {
-    try{
+      try{
     const PORT = process.env.PORT;
     this.server.listen(PORT, () => {
       console.log('listening on port', PORT);
     })
   }
-    catch (error){
-    console.log('Server error', error.message)
+    catch (e){
+    console.log('Server error', e.message)
     process.exit(1)
     }
   }
-  
 }

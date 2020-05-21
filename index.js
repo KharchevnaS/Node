@@ -1,4 +1,3 @@
-const ContactsServer = require('./api/server');
+const UsersServer = require('./api/server');
 
-new ContactsServer().start();
-
+new UsersServer().start();

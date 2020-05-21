@@ -11,5 +11,5 @@
             ],
             "program": "${workspaceFolder}\\index.js"
         }
-    ]
+   ]
 }
