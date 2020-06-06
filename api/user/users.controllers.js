@@ -1,18 +1,20 @@
-const userModel = require('./user.model');
-const express = require('express');
-const bcryptjs = require('bcryptjs');
-const {
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '../.env') });
+const Joi = require('joi');
+let {
   Types: { ObjectId },
 } = require('mongoose');
-const Joi = require('joi');
+// const { v4: uuidv4 } = require('uuid');
+const userModel = require('./user.model');
+const Generator = require('id-generator');
+const bcryptjs = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const { UnauthorizedError } = require('../helpers/errors.constructor');
 const _ = require('lodash');
 const multer = require('multer');
-const path = require('path');
-const shortId = require("shortid");
-const { createAvatar } = require("../helpers/avatar.constructor");
-
+const shortId = require('shortid');
+const { createAvatar } = require('../helpers/avatar.constructor');
+const { UnauthorizedError } = require('../helpers/errors.constructor');
+const sgMail = require('@sendgrid/mail');
 
 module.exports = {
   constructor() {
@@ -34,35 +36,35 @@ module.exports = {
     return this._getCurrentUser.bind(this);
   },
 
-  get updateUsersAllInfo(){
+  get updateUsersAllInfo() {
     return this._updateUsersAllInfo.bind(this);
   },
   get uploadsAvatar() {
-      return this._uploadsAvatar.bind(this);
+    return this._uploadsAvatar.bind(this);
   },
 
-  async _uploadsAvatar (req, res, next) {
-   try { 
-     const storage = multer.diskStorage({
-      destination: "public/images",
-      filename: (req, file, cb) => {
-        const { name, ext } = path.parse(file.originalname);
-        cb(null, name + "__" + shortId() + ext);
-      },
-    });
-    const upload = multer({ storage: storage });
-    return upload.single("avatar");
-   } catch(err){
-      next(err)
-       }
+  async _uploadsAvatar(req, res, next) {
+    try {
+      const storage = multer.diskStorage({
+        destination: 'public/images',
+        filename: (req, file, cb) => {
+          const { name, ext } = path.parse(file.originalname);
+          cb(null, name + '__' + shortId() + ext);
+        },
+      });
+      const upload = multer({ storage: storage });
+      return upload.single('avatar');
+    } catch (err) {
+      next(err);
+    }
   },
 
-multerHandler () {
+  multerHandler() {
     const upload = multer();
     return upload.any();
   },
 
- async _updateUsersAllInfo (req, res, next) {
+  async _updateUsersAllInfo(req, res, next) {
     try {
       const contactId = req.user.id;
       const newProperties = req.body;
@@ -71,11 +73,11 @@ multerHandler () {
         const avatarFileName = path.basename(req.user.avatarURL);
         const avatarPath = path.join(
           __dirname,
-          `../public/images/${avatarFileName}`
+          `../public/images/${avatarFileName}`,
         );
         await fsPromises.writeFile(avatarPath, newAvatar);
       }
-  
+
       await actions.findAndUpdate(contactId, newProperties);
       return res.status(200).json({
         avatarURL: req.user.avatarURL,
@@ -87,45 +89,50 @@ multerHandler () {
 
   async _addUser(req, res, next) {
     try {
-      const { password, email, name, subscription } = req.body;
-      const passwordHash = await bcryptjs.hash(password, this._costFactor);
+      const { name, email, password, subscription } = req.body;
+      const costFactor = 7;
+      const passwordHash = await bcryptjs.hash(password, costFactor);
+
       const existingUser = await userModel.findUserByEmail(email);
+
       if (!existingUser) {
-      const userAvatar = await createAvatar(email);
-      const id = shortId();
-      const avatarName = `${id}__${name}.png`;
-      const avatarPath = path.join(
-        __dirname,
-        `../public/images/${avatarName}`
-      );
-      await fsPromises.writeFile(avatarPath, userAvatar);
-      const avatarURL = `http://localhost:3021/images/${avatarName}`;
-      
-      const user = await userModel.create({
-        name,
-        email,
-        password: passwordHash,
-        subscription,
-        avatarURL
-      });
+        const userAvatar = await createAvatar(email);
+        const id = shortId();
+        const avatarName = `${id}__${name}.png`;
+        const avatarPath = path.join(
+          __dirname,
+          `../public/images/${avatarName}`,
+        );
+        await fsPromises.writeFile(avatarPath, userAvatar);
+        const avatarURL = `http://localhost:3021/images/${avatarName}`;
 
-      const token = await jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
-        expiresIn: 1 * 10 * 5 * 10,
-      });
-      await userModel.updateToken(user._id, token);
+        const user = await userModel.create({
+          name,
+          email,
+          password: passwordHash,
+          subscription,
+          avatarURL,
+        });
 
-      return res.status(201).json({
-        token,
-        user: {
-          email: user.email,
-          subscription: user.subscription,
-        },
-      });
-    } else {
-      return res.status(400).json({
-        message: "Email in use",
-      });
-    }
+        const token = await jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
+          expiresIn: 1 * 10 * 5 * 10,
+        });
+        await userModel.updateToken(user._id, token);
+
+        await this.sendVerificationEmail(user);
+
+        return res.status(201).json({
+          token,
+          user: {
+            email: user.email,
+            subscription: user.subscription,
+          },
+        });
+      } else {
+        return res.status(400).json({
+          message: 'Email in use',
+        });
+      }
     } catch (err) {
       next(err);
     }
@@ -135,7 +142,7 @@ multerHandler () {
     try {
       const { email, password } = req.body;
       const user = await userModel.findUserByEmail(email);
-      if (!user) {
+      if (!user || user.status !== 'verified') {
         return res.status(400).json({ message: 'Неверный логин или пароль' });
       }
       const isPasswordValid = await bcryptjs.compare(password, user.password);
@@ -250,6 +257,20 @@ multerHandler () {
     }
   },
 
+  async verifyEmail(req, res, next) {
+    try {
+      const { token } = req.params;
+      const userToVerify = await userModel.findByVerificationToken(token);
+      if (!userToVerify) {
+        return res.status(404).json('User not found');
+      }
+      await userModel.verifyUser(userToVerify._id);
+      return res.status(200).send('User');
+    } catch (err) {
+      next(err);
+    }
+  },
+
   validateId(req, res, next) {
     const { id } = req.params;
     if (!ObjectId.isValid(id)) {
@@ -300,5 +321,28 @@ multerHandler () {
       return { id: _id, email, password, subscription };
     });
   },
-};
 
+  async sendVerificationEmail(user) {
+    // const verificationToken = uuidv4();
+    var g = new Generator();
+    const verificationToken = g.newId();
+    await userModel.createVerificationToken(user._id, verificationToken);
+
+    sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+
+    const msg = {
+      to: 'ceyechky@i.ua',
+      from: 'ceyechky@gmail.com',
+      subject: 'Email verification',
+      text: 'HW 06: emailing with Node.js',
+      html:
+        '<a href="http://localhost:3021/users/auth/verify/${verificationToken}">please verify your email</a>',
+    };
+
+    function main() {
+      const result = sgMail.send(msg);
+      console.log(result);
+    }
+    await main();
+  },
+};
